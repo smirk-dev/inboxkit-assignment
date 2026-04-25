@@ -9,7 +9,8 @@ export function getSocket(): AppSocket {
   if (socket) return socket;
 
   socket = io(process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000', {
-    transports: ['websocket', 'polling'],
+    // polling first → stable connection; Socket.IO upgrades to WebSocket automatically
+    transports: ['polling', 'websocket'],
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: Infinity,

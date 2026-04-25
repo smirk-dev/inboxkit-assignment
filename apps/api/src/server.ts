@@ -33,6 +33,46 @@ function usernameToColor(username: string): string {
   return COLOR_PALETTE[Math.abs(hash) % COLOR_PALETTE.length];
 }
 
+async function handleConnection(
+  io: SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>,
+  socket: import('socket.io').Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>
+): Promise<void> {
+  const base = uniqueNamesGenerator({
+    dictionaries: [adjectives, animals],
+    separator: '-',
+    length: 2,
+    style: 'lowerCase',
+  });
+  const username = `${base}-${Math.floor(Math.random() * 100)}`;
+  const userId = uuidv4();
+  const color = usernameToColor(username);
+
+  socket.data = { userId, username, color, msgTimestamps: [] };
+
+  const grid = await getAllTiles();
+  const onlineCount = io.sockets.sockets.size;
+
+  socket.emit('init', { user: { id: userId, username, color }, grid, online_count: onlineCount });
+  socket.broadcast.emit('user_joined', { online_count: onlineCount, username });
+
+  registerClaimHandler(io, socket);
+
+  socket.on('request_snapshot', () => {
+    void getAllTiles().then((freshGrid) => {
+      socket.emit('init', {
+        user: { id: socket.data.userId, username: socket.data.username, color: socket.data.color },
+        grid: freshGrid,
+        online_count: io.sockets.sockets.size,
+      });
+    }).catch((err) => console.error('request_snapshot error', err));
+  });
+
+  socket.on('disconnect', () => {
+    const count = io.sockets.sockets.size;
+    io.emit('user_left', { online_count: count, username: socket.data.username });
+  });
+}
+
 async function main() {
   await redis.connect();
   await redisSub.connect();
@@ -62,45 +102,11 @@ async function main() {
 
   io.adapter(createAdapter(redis, redisSub));
 
-  io.on('connection', async (socket) => {
-    // Generate a unique anonymous identity for this session
-    const base = uniqueNamesGenerator({
-      dictionaries: [adjectives, animals],
-      separator: '-',
-      length: 2,
-      style: 'lowerCase',
-    });
-    const username = `${base}-${Math.floor(Math.random() * 100)}`;
-    const userId = uuidv4();
-    const color = usernameToColor(username);
-
-    socket.data = { userId, username, color, msgTimestamps: [] };
-
-    const [grid] = await Promise.all([getAllTiles()]);
-    const onlineCount = io.sockets.sockets.size;
-
-    socket.emit('init', {
-      user: { id: userId, username, color },
-      grid,
-      online_count: onlineCount,
-    });
-
-    socket.broadcast.emit('user_joined', { online_count: onlineCount, username });
-
-    registerClaimHandler(io, socket);
-
-    socket.on('request_snapshot', async () => {
-      const freshGrid = await getAllTiles();
-      socket.emit('init', {
-        user: { id: socket.data.userId, username: socket.data.username, color: socket.data.color },
-        grid: freshGrid,
-        online_count: io.sockets.sockets.size,
-      });
-    });
-
-    socket.on('disconnect', () => {
-      const count = io.sockets.sockets.size;
-      io.emit('user_left', { online_count: count, username: socket.data.username });
+  io.on('connection', (socket) => {
+    // Wrap async setup in a named function so unhandled rejections don't crash the process
+    void handleConnection(io, socket).catch((err) => {
+      console.error('Connection handler error', err);
+      socket.disconnect(true);
     });
   });
 
