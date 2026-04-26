@@ -16,33 +16,43 @@ function timeAgo(isoString: string | null): string {
 
 export function ActivityFeed({ claims }: ActivityFeedProps) {
   return (
-    <aside className="h-full flex flex-col bg-slate-850 border-l border-slate-700">
-      <div className="px-4 py-3 border-b border-slate-700 flex-shrink-0">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+    <aside
+      className="h-full flex flex-col"
+      style={{ background: '#ffffff', borderLeft: '3px solid #000' }}
+    >
+      <div
+        className="px-4 py-3 flex-shrink-0"
+        style={{ borderBottom: '3px solid #000' }}
+      >
+        <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#000' }}>
           Live Activity
         </h2>
       </div>
 
       <ul className="flex-1 overflow-y-auto">
         {claims.length === 0 && (
-          <li className="px-4 py-6 text-xs text-slate-500 text-center">
+          <li className="px-4 py-6 text-xs font-medium text-center" style={{ color: '#555' }}>
             No claims yet — click a tile!
           </li>
         )}
         {claims.map((claim, i) => (
           <li
             key={i}
-            className="px-4 py-2.5 flex items-center gap-3 border-b border-slate-800 hover:bg-slate-800/40 transition-colors"
+            className="px-4 py-2.5 flex items-center gap-3"
+            style={{ borderBottom: '2px solid #000' }}
           >
             <div
-              className="w-3 h-3 rounded-sm flex-shrink-0 ring-1 ring-black/20"
-              style={{ backgroundColor: claim.owner_color ?? '#1E293B' }}
+              className="w-4 h-4 flex-shrink-0"
+              style={{
+                backgroundColor: claim.owner_color ?? '#EBEBEB',
+                border: '2px solid #000',
+              }}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-slate-200 truncate leading-tight">
+              <p className="text-xs font-bold truncate leading-tight" style={{ color: '#000' }}>
                 {claim.owner_username ?? 'Unknown'}
               </p>
-              <p className="text-xs text-slate-500 leading-tight mt-0.5">
+              <p className="text-xs leading-tight mt-0.5" style={{ color: '#555' }}>
                 ({claim.x}, {claim.y}) · {timeAgo(claim.claimed_at)}
               </p>
             </div>
@@ -50,8 +60,13 @@ export function ActivityFeed({ claims }: ActivityFeedProps) {
         ))}
       </ul>
 
-      <div className="px-4 py-2 border-t border-slate-700 flex-shrink-0">
-        <p className="text-xs text-slate-600 text-center">last {claims.length} claims</p>
+      <div
+        className="px-4 py-2 flex-shrink-0"
+        style={{ borderTop: '3px solid #000' }}
+      >
+        <p className="text-xs font-medium text-center" style={{ color: '#555' }}>
+          last {claims.length} claims
+        </p>
       </div>
     </aside>
   );
