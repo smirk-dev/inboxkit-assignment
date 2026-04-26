@@ -18,7 +18,7 @@ export function ActivityFeed({ claims }: ActivityFeedProps) {
   return (
     <aside
       className="h-full flex flex-col"
-      style={{ background: '#ffffff', borderLeft: '3px solid #000' }}
+      style={{ background: '#ffffff' }}
     >
       <div
         className="px-4 py-3 flex-shrink-0"
@@ -37,8 +37,8 @@ export function ActivityFeed({ claims }: ActivityFeedProps) {
         )}
         {claims.map((claim, i) => (
           <li
-            key={i}
-            className="px-4 py-2.5 flex items-center gap-3"
+            key={`${claim.x},${claim.y},${claim.claimed_at ?? i}`}
+            className="feed-item-enter px-4 py-2.5 flex items-center gap-3"
             style={{ borderBottom: '2px solid #000' }}
           >
             <div
