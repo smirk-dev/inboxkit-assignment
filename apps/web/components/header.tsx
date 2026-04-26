@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { UserInfo } from '@tilewar/types';
 
-const COOLDOWN_MS = 5000;
+const COOLDOWN_MS = 3000;
 
 interface HeaderProps {
   user: UserInfo | null;

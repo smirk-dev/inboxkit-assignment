@@ -124,7 +124,7 @@ No payload.
 | Limit | Scope | Mechanism | Behavior on breach |
 |---|---|---|---|
 | 20 messages / 5 seconds | Per socket (sliding window) | In-memory | Server emits `claim_rejected { reason: 'rate_limit' }`, ignores further messages briefly |
-| 1 successful claim / 5 seconds | Per user | Redis `SET NX EX 5` | Server emits `claim_rejected { reason: 'cooldown', cooldown_remaining_ms }` |
+| 1 successful claim / 3 seconds | Per user | Redis `SET NX EX 3` | Server emits `claim_rejected { reason: 'cooldown', cooldown_remaining_ms }` |
 | 100 connections / IP | Per IP | Connection-handler level | TCP connection rejected before WebSocket upgrade |
 
 Cooldown timing is enforced server-side only. The client UI hint is advisory — never the gate.

@@ -14,7 +14,7 @@ export const redisSub = new Redis(process.env.REDIS_URL!, {
 redis.on('error', (err) => console.error('Redis error', err));
 redisSub.on('error', (err) => console.error('RedisSub error', err));
 
-const COOLDOWN_TTL_S = 5;
+const COOLDOWN_TTL_S = 3;
 
 export async function tryAcquireCooldown(
   userId: string
