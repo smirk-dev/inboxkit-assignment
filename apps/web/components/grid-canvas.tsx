@@ -10,6 +10,7 @@ import {
   drawGrid,
   drawSingleTile,
   pixelToTile,
+  tileToPixel,
   type Transform,
 } from '@/lib/grid-renderer';
 
@@ -32,6 +33,8 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
   const panRef = useRef({ isDragging: false, startX: 0, startY: 0, startOffX: 0, startOffY: 0 });
   const userRef = useRef<UserInfo | null>(null);
   const centeredRef = useRef(false);
+  const claimFlashRef = useRef<Map<string, number>>(new Map());
+  const flashRafRef = useRef<number | null>(null);
 
   useEffect(() => { userRef.current = user; }, [user]);
 
@@ -84,20 +87,47 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
       redrawAll();
     };
 
+    const startFlashLoop = () => {
+      if (flashRafRef.current !== null) return;
+      const tick = (now: DOMHighResTimeStamp) => {
+        redrawAll();
+        const ctx = getCtx();
+        let hasActive = false;
+        if (ctx) {
+          for (const [key, startTs] of claimFlashRef.current) {
+            const elapsed = now - startTs;
+            if (elapsed >= 400) { claimFlashRef.current.delete(key); continue; }
+            hasActive = true;
+            const alpha = (1 - elapsed / 400) * 0.7;
+            const [tx, ty] = key.split(',').map(Number);
+            const { px, py } = tileToPixel(tx, ty, transformRef.current);
+            const tilePixels = TILE_SIZE * transformRef.current.scale;
+            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+            ctx.fillRect(px, py, tilePixels - 1, tilePixels - 1);
+          }
+        }
+        if (hasActive) {
+          flashRafRef.current = requestAnimationFrame(tick);
+        } else {
+          flashRafRef.current = null;
+          redrawAll();
+        }
+      };
+      flashRafRef.current = requestAnimationFrame(tick);
+    };
+
     const handleTileClaimed = (tile: TileSnapshot) => {
       const key = `${tile.x},${tile.y}`;
       gridStateRef.current.set(key, tile);
       pendingRef.current.delete(key);
-      const ctx = getCtx();
-      if (ctx) {
-        const isHovered = hoverRef.current?.x === tile.x && hoverRef.current?.y === tile.y;
-        drawSingleTile(ctx, tile, transformRef.current, isHovered);
-      }
+      claimFlashRef.current.set(key, performance.now());
+      startFlashLoop();
       onTileClaimed(tile);
     };
 
     const handleClaimRejected = (payload: { x: number; y: number; reason: string }) => {
       const key = `${payload.x},${payload.y}`;
+      claimFlashRef.current.delete(key);
       if (!pendingRef.current.has(key)) return;
       const prev = pendingRef.current.get(key);
       pendingRef.current.delete(key);
@@ -132,6 +162,10 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
       socket.off('tile_claimed', handleTileClaimed);
       socket.off('claim_rejected', handleClaimRejected);
       socket.off('tiles_cleared', handleTilesCleared);
+      if (flashRafRef.current !== null) {
+        cancelAnimationFrame(flashRafRef.current);
+        flashRafRef.current = null;
+      }
     };
   }, [redrawAll, onTileClaimed]);
 
@@ -168,7 +202,7 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
 
     if (tile?.x !== hoverRef.current?.x || tile?.y !== hoverRef.current?.y) {
       hoverRef.current = tile;
-      redrawAll();
+      if (flashRafRef.current === null) redrawAll();
     }
   };
 
@@ -242,7 +276,7 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
       onMouseLeave={() => {
         panRef.current.isDragging = false;
         hoverRef.current = null;
-        redrawAll();
+        if (flashRafRef.current === null) redrawAll();
       }}
       onWheel={handleWheel}
     />
