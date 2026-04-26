@@ -12,7 +12,7 @@ import type {
   SocketData,
 } from '@tilewar/types';
 import { redis, redisSub } from './lib/redis';
-import { getAllTiles } from './repos/tiles';
+import { getAllTiles, clearUserTiles } from './repos/tiles';
 import { registerClaimHandler } from './handlers/claim';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -65,6 +65,14 @@ async function handleConnection(
   socket.broadcast.emit('user_joined', { online_count: onlineCount, username });
 
   registerClaimHandler(io, socket);
+
+  socket.on('clear_my_tiles', () => {
+    void clearUserTiles(socket.data.userId).then((tiles) => {
+      if (tiles.length > 0) {
+        io.emit('tiles_cleared', { owner_id: socket.data.userId, tiles });
+      }
+    }).catch((err) => console.error('clear_my_tiles error', err));
+  });
 
   socket.on('request_snapshot', () => {
     void getAllTiles().then((freshGrid) => {
