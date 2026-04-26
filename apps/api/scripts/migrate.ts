@@ -4,7 +4,10 @@ import path from 'path';
 import { Pool } from 'pg';
 
 async function migrate() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  });
 
   console.log('Applying grid resize migration (50x50 → 20x10)...');
   await pool.query(`DELETE FROM tiles WHERE x >= 30 OR y >= 15`);
