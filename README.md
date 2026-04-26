@@ -334,16 +334,16 @@ On `tile_claimed`: decrement previous owner (from `tileOwnersRef`), increment ne
 
 ## Trade-off log
 
-| Decision | What it costs | Why it was right |
-|---|---|---|
-| Postgres as source of truth | ~10ms latency per claim (Supabase round-trip) | Durable across restarts; row-level lock gives free atomic conflict resolution |
-| Socket.IO over native `ws` | Heavier wire protocol, slightly more bandwidth | Auto-reconnect, rooms, Redis adapter — all included |
-| Canvas over DOM tiles | No native ARIA tree | Smooth 60fps zoom/pan; reconciling 450 React nodes per claim causes lag |
-| Anonymous identity | Session-scoped — identity lost on tab close | No auth flow needed for the assessment; color is deterministic so reconnects look consistent |
-| Redis for cooldown | Extra infra dependency | Self-cleaning keys, atomic SET NX EX, survives server restart, ~1ms vs ~10ms |
-| Full snapshot on reconnect | ~30KB per reconnect | Delta-log infra not worth complexity at 450 tiles |
-| Optimistic updates | Higher client code complexity | Instant UI feedback even at 200ms RTT |
-| Client-side leaderboard | Counts can drift by ±1 if `tile_claimed` arrives before `init` | Zero backend changes; recovers on next `init` / reconnect |
+| Decision | Trade-off / Cost | Reasoning |
+| --- | --- | --- |
+| Postgres as source of truth | ~10 ms extra latency per claim vs in-memory/cache-only | Durable state, row-level locking gives atomic conflict resolution "for free" |
+| Socket.IO instead of native ws | Heavier protocol, a bit more bandwidth | Built-in auto-reconnect, rooms, and Redis adapter simplify realtime infra |
+| Canvas instead of DOM/CSS Grid | No native ARIA tree; accessibility needs extra work | Smooth 60fps pan/zoom and redraw for 450 tiles; avoids React reconciliation thrash on every claim |
+| Anonymous, session-scoped identity | Identity is lost on tab close | Avoids full auth system while still giving users a persistent name/color per session |
+| Redis for cooldowns | Additional infrastructure dependency | Atomic `SET NX EX`, self-cleaning keys, survives restarts, ~1 ms vs ~10 ms for equivalent Postgres logic |
+| Full-state snapshot on reconnect | ~30 KB per reconnect | Simpler than implementing a delta or event-log replay for only 450 tiles |
+| Optimistic client updates | Higher client complexity (snapshots, rollback) | Makes claims feel instant even with 150–200 ms network RTT |
+| Client-side leaderboard | Counts can drift by ±1 during race conditions or init timing | No additional backend queries or socket events; derived entirely from existing `tile_claimed` stream |
 
 ---
 
