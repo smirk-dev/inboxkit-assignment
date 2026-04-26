@@ -16,7 +16,16 @@ import { getAllTiles } from './repos/tiles';
 import { registerClaimHandler } from './handlers/claim';
 
 const PORT = Number(process.env.PORT ?? 4000);
-const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+// Support comma-separated list of allowed origins, e.g. "https://tilewar.vercel.app,http://localhost:3000"
+const ALLOWED_ORIGINS = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true; // server-to-server or same-origin
+  return ALLOWED_ORIGINS.includes(origin);
+}
 
 const COLOR_PALETTE = [
   '#EF4444', '#F97316', '#EAB308', '#22C55E',
@@ -80,8 +89,9 @@ async function main() {
   const app = Fastify({ logger: { level: 'info' } });
 
   await app.register(cors, {
-    origin: FRONTEND_URL,
+    origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
     methods: ['GET', 'POST', 'OPTIONS'],
+    credentials: true,
   });
 
   app.get('/health', async () => ({ ok: true, ts: new Date().toISOString() }));
@@ -93,8 +103,9 @@ async function main() {
     SocketData
   >(app.server, {
     cors: {
-      origin: FRONTEND_URL,
+      origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
       methods: ['GET', 'POST'],
+      credentials: true,
     },
     perMessageDeflate: true,
     transports: ['websocket', 'polling'],
