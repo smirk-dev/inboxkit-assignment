@@ -67,6 +67,7 @@ export default function Home() {
     };
 
     const handleTileClaimedForLeader = (tile: TileSnapshot) => {
+      if (!tile.owner_id) return;
       const key = `${tile.x},${tile.y}`;
       const prevOwner = tileOwnersRef.current.get(key);
 
