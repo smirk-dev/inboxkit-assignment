@@ -91,6 +91,11 @@ async function handleConnection(
 }
 
 async function main() {
+  const missingVars = ['DATABASE_URL', 'REDIS_URL'].filter((k) => !process.env[k]);
+  if (missingVars.length) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  }
+
   await redis.connect();
   await redisSub.connect();
 

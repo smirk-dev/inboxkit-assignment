@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && npx turbo run build --filter=@tilewar/api",
+    "buildCommand": "npm install --include=dev && npx turbo run build --filter=@tilewar/api && npm run db:migrate",
     "watchPatterns": [
       "apps/api/**",
       "packages/types/**",
@@ -13,9 +13,9 @@
     ]
   },
   "deploy": {
-    "startCommand": "npm run db:migrate && node apps/api/dist/server.js",
+    "startCommand": "node apps/api/dist/server.js",
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 30,
+    "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
