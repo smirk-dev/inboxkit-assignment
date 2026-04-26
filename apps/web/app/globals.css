@@ -2,18 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-bg: #FFE500;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --border-brutal: 3px solid #000000;
+  --shadow-brutal: 4px 4px 0px #000000;
+  --shadow-brutal-lg: 6px 6px 0px #000000;
+}
+
 html,
 body {
   height: 100%;
   margin: 0;
   overflow: hidden;
+  font-family: var(--font-space-grotesk), sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* Prevent canvas from having default outline on focus */
 canvas:focus {
   outline: none;
+}
+
+.brutal-card {
+  background: #ffffff;
+  border: var(--border-brutal);
+  box-shadow: var(--shadow-brutal);
+}
+
+.brutal-btn {
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  font-weight: 700;
+  cursor: pointer;
+  transition: box-shadow 0.05s, transform 0.05s;
+}
+
+.brutal-btn:hover {
+  box-shadow: 1px 1px 0 #000;
+  transform: translate(2px, 2px);
+}
+
+.brutal-btn:active {
+  box-shadow: none;
+  transform: translate(3px, 3px);
 }
