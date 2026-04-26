@@ -13,8 +13,8 @@ type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerE
 type AppServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
 const ClaimPayloadSchema = z.object({
-  x: z.number().int().min(0).max(49),
-  y: z.number().int().min(0).max(49),
+  x: z.number().int().min(0).max(29),
+  y: z.number().int().min(0).max(14),
 });
 
 const RATE_WINDOW_MS = 5_000;
