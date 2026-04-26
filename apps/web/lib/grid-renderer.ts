@@ -1,10 +1,11 @@
 import type { TileSnapshot } from '@tilewar/types';
 
-export const GRID_SIZE = 50;
-export const TILE_SIZE = 14;
+export const GRID_COLS = 30;
+export const GRID_ROWS = 15;
+export const TILE_SIZE = 40;
 
-const EMPTY_COLOR = '#1E293B';
-const HOVER_OVERLAY = 'rgba(255,255,255,0.12)';
+const EMPTY_COLOR = '#EBEBEB';
+const HOVER_OVERLAY = 'rgba(0,0,0,0.15)';
 
 export interface Transform {
   scale: number;
@@ -19,7 +20,7 @@ export function pixelToTile(
 ): { x: number; y: number } | null {
   const tileX = Math.floor((canvasX - transform.offsetX) / (TILE_SIZE * transform.scale));
   const tileY = Math.floor((canvasY - transform.offsetY) / (TILE_SIZE * transform.scale));
-  if (tileX < 0 || tileX >= GRID_SIZE || tileY < 0 || tileY >= GRID_SIZE) return null;
+  if (tileX < 0 || tileX >= GRID_COLS || tileY < 0 || tileY >= GRID_ROWS) return null;
   return { x: tileX, y: tileY };
 }
 
@@ -43,10 +44,12 @@ export function drawGrid(
   const { scale, offsetX, offsetY } = transform;
   const tilePixels = TILE_SIZE * scale;
 
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  // Black fill so the inter-tile gap shows as black grid lines
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
+  for (let y = 0; y < GRID_ROWS; y++) {
+    for (let x = 0; x < GRID_COLS; x++) {
       const px = x * tilePixels + offsetX;
       const py = y * tilePixels + offsetY;
 
@@ -56,7 +59,7 @@ export function drawGrid(
 
       const tile = gridState.get(`${x},${y}`);
       ctx.fillStyle = tile?.owner_color ?? EMPTY_COLOR;
-      // -1 creates a 1px gap between tiles that reads as a subtle grid
+      // -1 creates a 1px gap between tiles that shows the black background
       ctx.fillRect(px, py, tilePixels - 1, tilePixels - 1);
 
       if (hoverTile && hoverTile.x === x && hoverTile.y === y) {
