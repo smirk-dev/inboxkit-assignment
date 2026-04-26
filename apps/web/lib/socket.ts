@@ -5,10 +5,8 @@ export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: AppSocket | null = null;
 
-export function getSocket(): AppSocket {
-  if (socket) return socket;
-
-  socket = io(process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000', {
+function createSocket(): AppSocket {
+  return io(process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000', {
     // polling first → stable connection; Socket.IO upgrades to WebSocket automatically
     transports: ['polling', 'websocket'],
     autoConnect: true,
@@ -17,17 +15,27 @@ export function getSocket(): AppSocket {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
   });
-
-  return socket;
 }
 
-// In dev, store the socket on window to survive HMR without creating duplicate connections
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const win = window as any;
-  if (win.__tilewar_socket) {
-    socket = win.__tilewar_socket;
-  } else {
-    win.__tilewar_socket = getSocket();
+export function getSocket(): AppSocket {
+  if (socket) return socket;
+
+  // In dev, reuse the existing socket across HMR reloads to prevent duplicate connections.
+  // The socket is only created here (lazily), never at module-load time, so it doesn't
+  // connect before React effects have a chance to register their event handlers.
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    const win = window as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (win.__tilewar_socket) {
+      socket = win.__tilewar_socket as AppSocket;
+      return socket;
+    }
   }
+
+  socket = createSocket();
+
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    (window as any).__tilewar_socket = socket; // eslint-disable-line @typescript-eslint/no-explicit-any
+  }
+
+  return socket;
 }
