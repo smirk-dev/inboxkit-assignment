@@ -50,3 +50,15 @@ canvas:focus {
   box-shadow: none;
   transform: translate(3px, 3px);
 }
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.feed-item-enter { animation: slideInRight 0.18s ease-out forwards; }
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.leaderboard-row-enter { animation: popIn 0.15s ease-out forwards; }
