@@ -39,12 +39,15 @@ export interface ServerToClientEvents {
   user_joined: (payload: { online_count: number; username: string }) => void;
   user_left: (payload: { online_count: number; username: string }) => void;
 
+  tiles_cleared: (payload: { owner_id: string; tiles: Array<{ x: number; y: number }> }) => void;
+
   error: (payload: { message: string; code?: string }) => void;
 }
 
 export interface ClientToServerEvents {
   claim_tile: (payload: { x: number; y: number }) => void;
   request_snapshot: () => void;
+  clear_my_tiles: () => void;
 }
 
 export interface InterServerEvents {
