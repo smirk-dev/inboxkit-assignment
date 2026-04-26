@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { GridCanvas } from '@/components/grid-canvas';
 import { ActivityFeed } from '@/components/activity-feed';
 import { Header } from '@/components/header';
+import { Leaderboard, type LeaderEntry } from '@/components/leaderboard';
 import { getSocket } from '@/lib/socket';
 import type { TileSnapshot, UserInfo } from '@tilewar/types';
 
@@ -13,6 +14,22 @@ export default function Home() {
   const [recentClaims, setRecentClaims] = useState<TileSnapshot[]>([]);
   const [lastClaimTime, setLastClaimTime] = useState<number | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'activity' | 'leaderboard'>('activity');
+  const [leaderEntries, setLeaderEntries] = useState<LeaderEntry[]>([]);
+
+  // tile key → current owner info (needed to decrement previous owner on claim)
+  const tileOwnersRef = useRef<Map<string, { ownerId: string; username: string; color: string } | null>>(new Map());
+  // owner id → aggregated entry (mutated in place, flushed to state via flushLeaderboard)
+  const leaderMapRef = useRef<Map<string, { username: string; color: string; tileCount: number }>>(new Map());
+
+  const flushLeaderboard = useCallback(() => {
+    const entries = Array.from(leaderMapRef.current.entries())
+      .filter(([, v]) => v.tileCount > 0)
+      .map(([ownerId, v]) => ({ ownerId, ...v }))
+      .sort((a, b) => b.tileCount - a.tileCount)
+      .slice(0, 10);
+    setLeaderEntries(entries);
+  }, []);
 
   useEffect(() => {
     const socket = getSocket();
@@ -20,6 +37,25 @@ export default function Home() {
     const handleInit = (payload: { user: UserInfo; grid: TileSnapshot[]; online_count: number }) => {
       setUser(payload.user);
       setOnlineCount(payload.online_count);
+
+      // Rebuild leaderboard state from the full grid snapshot
+      tileOwnersRef.current.clear();
+      leaderMapRef.current.clear();
+      for (const tile of payload.grid) {
+        const key = `${tile.x},${tile.y}`;
+        if (tile.owner_id) {
+          tileOwnersRef.current.set(key, { ownerId: tile.owner_id, username: tile.owner_username!, color: tile.owner_color! });
+          const entry = leaderMapRef.current.get(tile.owner_id);
+          if (entry) {
+            entry.tileCount++;
+          } else {
+            leaderMapRef.current.set(tile.owner_id, { username: tile.owner_username!, color: tile.owner_color!, tileCount: 1 });
+          }
+        } else {
+          tileOwnersRef.current.set(key, null);
+        }
+      }
+      flushLeaderboard();
     };
 
     const handleUserJoined = ({ online_count }: { online_count: number }) => {
@@ -30,9 +66,46 @@ export default function Home() {
       setOnlineCount(online_count);
     };
 
+    const handleTileClaimedForLeader = (tile: TileSnapshot) => {
+      const key = `${tile.x},${tile.y}`;
+      const prevOwner = tileOwnersRef.current.get(key);
+
+      if (prevOwner && prevOwner.ownerId !== tile.owner_id) {
+        const prevEntry = leaderMapRef.current.get(prevOwner.ownerId);
+        if (prevEntry) prevEntry.tileCount = Math.max(0, prevEntry.tileCount - 1);
+      }
+
+      const newEntry = leaderMapRef.current.get(tile.owner_id);
+      if (newEntry) {
+        newEntry.tileCount++;
+        newEntry.username = tile.owner_username!;
+        newEntry.color = tile.owner_color!;
+      } else {
+        leaderMapRef.current.set(tile.owner_id, { username: tile.owner_username!, color: tile.owner_color!, tileCount: 1 });
+      }
+
+      tileOwnersRef.current.set(key, { ownerId: tile.owner_id, username: tile.owner_username!, color: tile.owner_color! });
+      flushLeaderboard();
+    };
+
+    const handleTilesClearedForLeader = (payload: { owner_id: string; tiles: Array<{ x: number; y: number }> }) => {
+      for (const { x, y } of payload.tiles) {
+        const key = `${x},${y}`;
+        const prevOwner = tileOwnersRef.current.get(key);
+        if (prevOwner) {
+          const entry = leaderMapRef.current.get(prevOwner.ownerId);
+          if (entry) entry.tileCount = Math.max(0, entry.tileCount - 1);
+        }
+        tileOwnersRef.current.set(key, null);
+      }
+      flushLeaderboard();
+    };
+
     socket.on('init', handleInit);
     socket.on('user_joined', handleUserJoined);
     socket.on('user_left', handleUserLeft);
+    socket.on('tile_claimed', handleTileClaimedForLeader);
+    socket.on('tiles_cleared', handleTilesClearedForLeader);
 
     // If the socket was already connected when this effect ran (e.g. after StrictMode
     // double-invoke or a very fast localhost connection), the server's auto-emitted
@@ -45,8 +118,10 @@ export default function Home() {
       socket.off('init', handleInit);
       socket.off('user_joined', handleUserJoined);
       socket.off('user_left', handleUserLeft);
+      socket.off('tile_claimed', handleTileClaimedForLeader);
+      socket.off('tiles_cleared', handleTilesClearedForLeader);
     };
-  }, []);
+  }, [flushLeaderboard]);
 
   // Detect when user tries to close the tab and offer to clean their tiles
   useEffect(() => {
@@ -116,9 +191,44 @@ export default function Home() {
           />
         </div>
 
-        {/* Activity feed sidebar */}
-        <div className="w-56 flex-shrink-0 hidden sm:flex flex-col">
-          <ActivityFeed claims={recentClaims} />
+        {/* Sidebar: tabbed panel — activity feed or leaderboard */}
+        <div
+          className="w-56 flex-shrink-0 hidden sm:flex flex-col"
+          style={{ borderLeft: '3px solid #000' }}
+        >
+          <div className="flex flex-shrink-0" style={{ borderBottom: '3px solid #000' }}>
+            <button
+              className="flex-1 py-2.5 text-xs font-bold uppercase tracking-wider"
+              style={{
+                background: activeTab === 'activity' ? '#FFE500' : '#ffffff',
+                color: '#000',
+                border: 'none',
+                borderRight: '2px solid #000',
+                cursor: 'pointer',
+              }}
+              onClick={() => setActiveTab('activity')}
+            >
+              Activity
+            </button>
+            <button
+              className="flex-1 py-2.5 text-xs font-bold uppercase tracking-wider"
+              style={{
+                background: activeTab === 'leaderboard' ? '#FFE500' : '#ffffff',
+                color: '#000',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              onClick={() => setActiveTab('leaderboard')}
+            >
+              Top 10
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {activeTab === 'activity'
+              ? <ActivityFeed claims={recentClaims} />
+              : <Leaderboard entries={leaderEntries} currentUserId={user?.id ?? null} />
+            }
+          </div>
         </div>
       </div>
 
