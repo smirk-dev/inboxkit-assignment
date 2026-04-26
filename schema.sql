@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users (last_seen_at DESC);
 
 -- ----------------------------------------------------------------------------
--- tiles: the grid state. 50x50 = 2,500 rows.
+-- tiles: the grid state. 30x15 = 450 rows.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tiles (
   x              SMALLINT NOT NULL,
@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS tiles (
   claimed_at     TIMESTAMPTZ,
   claim_count    INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (x, y),
-  CHECK (x >= 0 AND x < 50),
-  CHECK (y >= 0 AND y < 50)
+  CHECK (x >= 0 AND x < 30),
+  CHECK (y >= 0 AND y < 15)
 );
 
 CREATE INDEX IF NOT EXISTS idx_tiles_owner       ON tiles (owner_id) WHERE owner_id IS NOT NULL;
@@ -67,8 +67,8 @@ CREATE INDEX IF NOT EXISTS idx_claims_log_user   ON claims_log (user_id, claimed
 -- ============================================================================
 INSERT INTO tiles (x, y)
 SELECT gx, gy
-FROM generate_series(0, 49) AS gx,
-     generate_series(0, 49) AS gy
+FROM generate_series(0, 29) AS gx,
+     generate_series(0, 14) AS gy
 ON CONFLICT (x, y) DO NOTHING;
 
 -- ============================================================================
