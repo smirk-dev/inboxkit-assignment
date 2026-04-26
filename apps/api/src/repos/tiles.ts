@@ -64,6 +64,20 @@ export async function logClaim(
     .catch((err) => console.error('claims_log insert failed', err));
 }
 
+export async function clearUserTiles(userId: string): Promise<Array<{ x: number; y: number }>> {
+  const { rows } = await pool.query<{ x: number; y: number }>(
+    `UPDATE tiles
+     SET owner_id       = NULL,
+         owner_username = NULL,
+         owner_color    = NULL,
+         claimed_at     = NULL
+     WHERE owner_id = $1
+     RETURNING x, y`,
+    [userId]
+  );
+  return rows;
+}
+
 export async function upsertUser(
   id: string,
   username: string,
