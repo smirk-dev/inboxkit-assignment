@@ -4,7 +4,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { TileSnapshot, UserInfo } from '@tilewar/types';
 import { getSocket } from '@/lib/socket';
 import {
-  GRID_SIZE,
+  GRID_COLS,
+  GRID_ROWS,
   TILE_SIZE,
   drawGrid,
   drawSingleTile,
@@ -18,19 +19,19 @@ interface GridCanvasProps {
   onClaimSent: () => void;
 }
 
-const INITIAL_TRANSFORM: Transform = { scale: 1, offsetX: 20, offsetY: 20 };
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 5;
 
 export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gridStateRef = useRef<Map<string, TileSnapshot>>(new Map());
-  const transformRef = useRef<Transform>(INITIAL_TRANSFORM);
+  const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
   // Stores the pre-claim tile state for optimistic rollback
   const pendingRef = useRef<Map<string, TileSnapshot | null>>(new Map());
   const panRef = useRef({ isDragging: false, startX: 0, startY: 0, startOffX: 0, startOffY: 0 });
   const userRef = useRef<UserInfo | null>(null);
+  const centeredRef = useRef(false);
 
   useEffect(() => { userRef.current = user; }, [user]);
 
@@ -50,6 +51,24 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
       const rect = canvas.parentElement!.getBoundingClientRect();
       canvas.width = rect.width;
       canvas.height = rect.height;
+
+      // Fit the entire grid in view on first load so no tiles are offscreen.
+      // Scale down if the grid is wider/taller than the canvas; never scale above 1x.
+      if (!centeredRef.current) {
+        centeredRef.current = true;
+        const scaleToFit = Math.min(
+          rect.width  / (GRID_COLS * TILE_SIZE),
+          rect.height / (GRID_ROWS * TILE_SIZE),
+          1
+        );
+        const gridW = GRID_COLS * TILE_SIZE * scaleToFit;
+        const gridH = GRID_ROWS * TILE_SIZE * scaleToFit;
+        transformRef.current = {
+          scale: scaleToFit,
+          offsetX: (rect.width  - gridW) / 2,
+          offsetY: (rect.height - gridH) / 2,
+        };
+      }
       redrawAll();
     };
     resize();
@@ -90,15 +109,29 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
       redrawAll();
     };
 
+    const handleTilesCleared = (payload: { owner_id: string; tiles: Array<{ x: number; y: number }> }) => {
+      for (const { x, y } of payload.tiles) {
+        gridStateRef.current.delete(`${x},${y}`);
+      }
+      redrawAll();
+    };
+
     socket.on('init', handleInit);
     socket.on('tile_claimed', handleTileClaimed);
     socket.on('claim_rejected', handleClaimRejected);
+    socket.on('tiles_cleared', handleTilesCleared);
+
+    // Recovery: if socket already connected before this effect ran, request fresh init
+    if (socket.connected) {
+      socket.emit('request_snapshot');
+    }
 
     return () => {
       window.removeEventListener('resize', resize);
       socket.off('init', handleInit);
       socket.off('tile_claimed', handleTileClaimed);
       socket.off('claim_rejected', handleClaimRejected);
+      socket.off('tiles_cleared', handleTilesCleared);
     };
   }, [redrawAll, onTileClaimed]);
 
@@ -202,7 +235,7 @@ export function GridCanvas({ user, onTileClaimed, onClaimSent }: GridCanvasProps
     <canvas
       ref={canvasRef}
       className="block w-full h-full"
-      style={{ cursor: 'crosshair' }}
+      style={{ cursor: 'crosshair', backgroundColor: '#000' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
